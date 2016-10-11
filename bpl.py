@@ -1,9 +1,9 @@
 #Power law binned module
 import math
 import numpy
-import scipy
+from scipy import optimize
 
-def bplpva(h, boundaries, **kwargs):
+def bplfit(h, boundaries, **kwargs):
 	rngal = []
 	limit = []
 	bminb = []
@@ -29,33 +29,33 @@ def bplpva(h, boundaries, **kwargs):
 	# 1. h must have integer counts.
 	if all(type(x) is int for x in h) == False:
 		print "(BPLFIT) Error: Vector h should be an integer vector"
-    	alpha = float('nan')
-    	bmin = boundaries[0]
-    	L = float('nan')
-    	return
+		alpha = float('nan')
+		bmin = boundaries[0]
+		L = float('nan')
+		return
 
 	# 2. h must be non-negative
 	if len(filter(lambda x: x < 0, h)):
-    	print "(BPLFIT) Error: Vector h should be non-negative"
-    	alpha = float('nan')
-    	bmin = boundaries[0]
-    	L = float('nan')
-    	return
+		print "(BPLFIT) Error: Vector h should be non-negative"
+		alpha = float('nan')
+		bmin = boundaries[0]
+		L = float('nan')
+		return
 
 	# 3. boundaries must have number of elements as one more than the number in h
 	if len(boundaries) != len(h) + 1:
 		print "(BPLFIT) Error: Incorrect number of elements in either boundaries or h"
 		alpha = float('nan')
-    	bmin = boundaries[0]
-    	L = float('nan')
+		bmin = boundaries[0]
+		L = float('nan')
 		return
 
 	# 4. Need atleast 2 bins to work with.
 	if len(h) < 2:
 		print "(BPLFIT) Error: I need atleast 2 bins to make this work"
 		alpha = float('nan')
-    	bmin = boundaries[0]
-    	L = float('nan')
+		bmin = boundaries[0]
+		L = float('nan')
 		return
 
 	# 5. Checking range vector
@@ -75,6 +75,84 @@ def bplpva(h, boundaries, **kwargs):
 		print "(BPLPVA) Error: 'bmin' argument must be a positive value < boundaries(end-1); using default."
 		bminb = boundaries[0]
 		return
+
+	# Reshape the input vectors
+	h = numpy.reshape(h, (len(h), 1))
+	boundaries = numpy.reshape(boundaries, (len(boundaries), 1))
+
+	# Need a minimum of 2 bins.
+	bmins = boundaries[1:-2]
+
+	if not bminb:
+		bmins = bmins[(bmins <= bminb)[::-1].argmax()]
+
+	if not limit:
+		bmins[bmins>limit] = []
+
+	dat = zeros((bmins.shape[0], bmins.shape[1]))
+
+	for xm in range(1, len(bmins)):
+		bmin = bmins[xm]
+
+		# Truncate the data below bmin
+		ind = (boundaries >= bminq)
+		z = h[ind:-1]
+		n = sum(z)
+		b = boundaries[ind:-1]
+
+		# estimate alpha using specified range or using
+	    # numerical maximization
+	    l = b[1:-2]
+		u = b[2:-1]
+		if not rngal
+			H = kron(ones((1, size(rngal))), z)	#repmat(z, 1, numel(rngal))
+			LOWER_EDGE = kron(ones((1, size(rngal))), l)	#repmat(l, 1, numel(rngal));
+			UPPER_EDGE = kron(ones((1, size(rngal))), u)	#repmat(u, 1, numel(rngal));
+			ALPHA_EST = kron(ones((size(b) - 1, 1)), rngal)	#repmat(rngal, numel(b)-1, 1);
+ 			temp = H * ( math.log(numpy.power(LOWER_EDGE, 1 - ALPHA_EST) - numpy.power(UPPER_EDGE, 1 - ALPHA_EST)) + (ALPHA_EST - 1) * math.log(bmin))  	#H .* (log(LOWER_EDGE.^(1-ALPHA_EST) - UPPER_EDGE.^(1-ALPHA_EST)) + (ALPHA_EST-1) .* log(bmin));
+			sum_ = sum(temp, axis = 1)	#sum(temp, 1);
+			I = sum_.index(max(sum_))	#[~,I] = max(sum_);
+			al = rngal[I]
+		else
+			hnd = lambda alpha: (alpha) -sum( z*( numpy.log((l)**(1-alpha) - (u)**(1-alpha)) + (alpha-1)*numpy.log(bmin) ) );
+			al = optimize.fmin(func=hnd, x0=1)	#fminsearch(hnd, 1);
+
+	    # compute KS statistic
+	    temp = z[::-1].cumsum(axis=0)    #cumsum(z(end:-1:1));
+	    cx = 1 - temp[::-1]/n    #1 - temp(end:-1:1)./n;
+	    cf = 1 - numpy.power((l/bmin),(1-al))    #1 - (l./bmin).^(1-al);
+		dat[xm] = numpy.concatenate(abs(cf - cx)).max() 	#max(abs(cf-cx));
+
+	# Choose bmin which minimizes the KS-statistic
+	D = min(dat)
+	bmin = bmins[(dat <= D).argmax()] #bmins(find(dat<=D, 1, 'first'));
+
+	# Truncate data below bmin and recompute alpha
+	ind = (boundaries >= bmin) #find(boundaries>=bmin, 1);
+	z = h[ind:-1] #h(ind:end);
+	b = boundaries[ind:-1] #boundaries(ind:end);
+	n = sum(z)
+	l = b[1:2] #b(1:end-1);
+	u = b[2:-1] #b(2:end);
+
+	# recompute alpha using specified range or using
+	# numerical maximization
+	if not rngal:
+		H = kron(ones((1, size(rngal))), z)	#repmat(z, 1, numel(rngal))
+		LOWER_EDGE = kron(ones((1, size(rngal))), l)	#repmat(l, 1, numel(rngal));
+		UPPER_EDGE = kron(ones((1, size(rngal))), u)	#repmat(u, 1, numel(rngal));
+		ALPHA_EST = kron(ones((size(b) - 1, 1)), rngal)	#repmat(rngal, numel(b)-1, 1);
+		temp = H * ( math.log(numpy.power(LOWER_EDGE, 1 - ALPHA_EST) - numpy.power(UPPER_EDGE, 1 - ALPHA_EST)) + (ALPHA_EST - 1) * math.log(bmin))  	#H .* (log(LOWER_EDGE.^(1-ALPHA_EST) - UPPER_EDGE.^(1-ALPHA_EST)) + (ALPHA_EST-1) .* log(bmin));
+		sum_ = sum(temp, axis = 1)	#sum(temp, 1);
+		I = sum_.index(max(sum_))	#[~,I] = max(sum_);
+		al = rngal[I]
+	else:
+		hnd = lambda alpha: (alpha) -sum( z*( numpy.log((l)**(1-alpha) - (u)**(1-alpha)) + (alpha-1)*numpy.log(bmin) ) );
+		alpha = optimize.fmin(func=hnd, x0=1)	#fminsearch(hnd, 1);
+
+	# Computing likelihood under fitted model (alpha, bmin)
+	L = (alpha - 1) * math.log(bmin) * sum(z) + sum(z*math.log(l**(1-alpha)) - u**(1-alpha)) #(alpha-1)*log(bmin)*sum(z) + sum(z.*log(l.^(1-alpha) - u.^(1-alpha)));
+	return [alpha, bmin, L]
 
 #PValue
 def bplpva(h, boundaries, bmin, **kwargs):
@@ -170,13 +248,13 @@ def bplpva(h, boundaries, bmin, **kwargs):
 
 	# Compute alpha using numerical maximization
 	hnd = lambda alpha: (alpha) -sum( z*( numpy.log((l)**(1-alpha) - (u)**(1-alpha)) + (alpha-1)*numpy.log(bmin) ) );
-	alpha = scipy.optimize.fmin(func=hnd, x0=1) #alpha = fminsearch(hnd, 1);
+	alpha = optimize.fmin(func=hnd, x0=1) #alpha = fminsearch(hnd, 1);
 
 	# Compute distance using KS statistic
-	temp = z.reverse().cumsum(axis=0)    #cumsum(z(end:-1:1));
-	cx = 1 - temp.reverse()/nz    #1 - temp(end:-1:1)./nz;
+	temp = z[::-1].cumsum(axis=0)    #cumsum(z(end:-1:1));
+	cx = 1 - temp[::-1]/nz    #1 - temp(end:-1:1)./nz;
 	cf = 1 - numpy.power((l/bmin),(1-alpha))    #1 - (l./bmin).^(1-alpha);
-	Dstar = concatenate(abs(cf - cx)).max() 	#max(abs(cf-cx));
+	Dstar = numpy.concatenate(abs(cf - cx)).max() 	#max(abs(cf-cx));
 
 	# ---------------------------------------------------------------
 	# Compute the distribution of gofs using semiparametric bootstrap
@@ -190,14 +268,14 @@ def bplpva(h, boundaries, bmin, **kwargs):
 		temp2=[]
 		for t in range(1, len(y) + 1):
 			temp2 = numpy.array([temp2,kron(ones((y[t],1)),temp[t])])	#[temp2;repmat(temp(t),y(t),1)];
-		temp2 = temp2[np.random.permutation(temp2.size())]	#temp2(randperm(numel(temp2)));
+		temp2 = temp2[numpy.random.permutation(len(temp2))]	#temp2(randperm(numel(temp2)));
 		x1 = temp2[ numpy.ceil(temp2.size() * numpy.random.random((1,n1)))]		#x1 = temp2(ceil(numel(temp2)*rand(n1,1)));
 		n2 = N - n1;
 		x2 = bmin*numpy.power(1 - numpy.random.random((1,n2), (-1/(alpha-1))))	#x2 = bmin.*(1-rand(n2,1)).^(-1/(alpha-1));
 		x = [x1,x2]
 		h2 = np.digitize(x, boundaries) 	#h2 = histc(x, boundaries);
 		h2 = np.delete(h2, -1)	#h2(end) = [];
-		ind = (h2.reverse() != 0).argmax() - 1    #ind = find(h2(end:-1:1)~=0,1,'first')-1;
+		ind = (h2[::-1] != 0).argmax() - 1    #ind = find(h2(end:-1:1)~=0,1,'first')-1;
 		if ind == 1:
 			h2 = np.delete(h2, -1)	#h2(end)= [];
 		else:
@@ -210,7 +288,7 @@ def bplpva(h, boundaries, bmin, **kwargs):
     	# Need a minimum of 2 bins.
     	bmins = boundaries2[1:-1-2];
     	if bminb:
-        	bmins = bmins[(bmins <= bminb).reverse().argmax()]	#bmins(find(bmins<=bminb, 1, 'last'));
+        	bmins = bmins[(bmins <= bminb)[::-1].argmax()]	#bmins(find(bmins<=bminb, 1, 'last'));
     	if limit:
         	bmins[(bmins > limit)] = [] 	#bmins(bmins>limit) = [];
     	dat = zeros((a.shape[0], a.shape[1])) 	#zeros(size(bmins));
@@ -239,11 +317,11 @@ def bplpva(h, boundaries, bmin, **kwargs):
         		al = rngal[I]
         	else:
         		hnd = lambda al2: (al2) -sum( zq*( numpy.log((lq)**(1-al2) - (uq)**(1-al2)) + (al2-1)*numpy.log(bminq) ) ); #TODO
-        		al = scipy.optimize.fmin(func=hnd, x0=1)	#fminsearch(hnd, 1);
+        		al = optimize.fmin(func=hnd, x0=1)	#fminsearch(hnd, 1);
 
             # compute KS statistic
-        	tempq = cumsum(zq.reverse())	#cumsum(zq(end:-1:1));
-        	cxq = 1 - tempq.reverse()/nq	#1 - tempq(end:-1:1)./nq;
+        	tempq = cumsum(zq[::-1])	#cumsum(zq(end:-1:1));
+        	cxq = 1 - tempq[::-1]/nq	#1 - tempq(end:-1:1)./nq;
         	cfq = 1 - numpy.power(lq/bminq, 1 - al) #1 - (lq./bminq).^(1-al);
         	dat[xm] = max(abs(cfq - cxq))	#dat(xm) = max(abs(cfq-cxq));
 
